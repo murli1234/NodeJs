@@ -2,29 +2,14 @@
 
 const express = require('express');
 const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
 
 // Create an Express application
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Connect to SQLite database
-// The database file will be created if it doesn't exist
-const db = new sqlite3.Database('./database.db', (err) => {
-    if (err) {
-        console.error(err.message);
-    }
-    console.log('Connected to the SQLite database.');
-});
-
-// Create a 'tasks' table if it doesn't exist
-db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        task TEXT NOT NULL,
-        completed BOOLEAN NOT NULL CHECK (completed IN (0, 1))
-    )`);
-});
+// In-memory storage for tasks
+let tasks = [];
+let nextId = 1;
 
 // --- Middleware ---
 // Serve static files from the 'public' directory
@@ -36,62 +21,64 @@ app.use(express.json());
 
 // GET: Read all tasks
 app.get('/api/tasks', (req, res) => {
-    const sql = "SELECT * FROM tasks ORDER BY id";
-    db.all(sql, [], (err, rows) => {
-        if (err) {
-            res.status(400).json({ "error": err.message });
-            return;
-        }
-        res.json({
-            "message": "success",
-            "data": rows
-        });
+    res.json({
+        "message": "success",
+        "data": [...tasks].sort((a, b) => a.id - b.id)
     });
 });
 
 // POST: Create a new task
 app.post('/api/tasks', (req, res) => {
-    const { task, completed } = req.body;
+    const { task, completed = false } = req.body;
     if (!task) {
         res.status(400).json({ "error": "Task content is required" });
         return;
     }
-    const sql = 'INSERT INTO tasks (task, completed) VALUES (?, ?)';
-    const params = [task, completed ? 1 : 0];
-    db.run(sql, params, function(err) {
-        if (err) {
-            res.status(400).json({ "error": err.message });
-            return;
-        }
-        res.json({
-            "message": "success",
-            "data": { id: this.lastID, task, completed },
-        });
+    
+    const newTask = {
+        id: nextId++,
+        task,
+        completed: Boolean(completed)
+    };
+    
+    tasks.push(newTask);
+    res.json({
+        "message": "success",
+        "data": newTask
     });
 });
 
 // PUT: Update a task (toggle completed status)
 app.put('/api/tasks/:id', (req, res) => {
+    const id = parseInt(req.params.id);
     const { completed } = req.body;
-    const sql = 'UPDATE tasks SET completed = ? WHERE id = ?';
-    db.run(sql, [completed ? 1 : 0, req.params.id], function(err) {
-        if (err) {
-            res.status(400).json({ "error": err.message });
-            return;
-        }
-        res.json({ message: "success", changes: this.changes });
+    const taskIndex = tasks.findIndex(t => t.id === id);
+    
+    if (taskIndex === -1) {
+        res.status(404).json({ "error": "Task not found" });
+        return;
+    }
+    
+    tasks[taskIndex] = {
+        ...tasks[taskIndex],
+        completed: Boolean(completed)
+    };
+    
+    res.json({ 
+        message: "success", 
+        changes: 1 
     });
 });
 
 // DELETE: Delete a task
 app.delete('/api/tasks/:id', (req, res) => {
-    const sql = 'DELETE FROM tasks WHERE id = ?';
-    db.run(sql, req.params.id, function(err) {
-        if (err) {
-            res.status(400).json({ "error": err.message });
-            return;
-        }
-        res.json({ "message": "deleted", changes: this.changes });
+    const id = parseInt(req.params.id);
+    const initialLength = tasks.length;
+    tasks = tasks.filter(task => task.id !== id);
+    
+    res.json({ 
+        "message": "deleted", 
+        changes: initialLength - tasks.length 
     });
 });
 
