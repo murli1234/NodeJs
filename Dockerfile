@@ -1,7 +1,7 @@
 # --- Base Image ---
 # Use an official Node.js runtime as a parent image.
 # Using alpine version for a smaller image size.
-FROM node:18-lts
+FROM node:18
 
 # --- Working Directory ---
 # Create and set the working directory in the container.
