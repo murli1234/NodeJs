@@ -1,0 +1,15 @@
+{
+  "name": "simple-nodejs-crud-app",
+  "version": "1.0.0",
+  "description": "A simple one-page Node.js web application with CRUD functionality",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "sqlite3": "^5.0.2"
+  },
+  "author": "",
+  "license": "ISC"
+}

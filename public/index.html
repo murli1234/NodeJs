@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Node.js & SQLite To-Do App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .task-item.completed span {
+            text-decoration: line-through;
+            color: #9ca3af; /* gray-400 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex items-center justify-center min-h-screen">
+
+    <div class="w-full max-w-2xl p-6 md:p-8 bg-white dark:bg-gray-800 shadow-lg rounded-xl">
+        <h1 class="text-3xl md:text-4xl font-bold mb-6 text-center text-gray-800 dark:text-white">My To-Do List</h1>
+
+        <!-- Form to add new tasks -->
+        <form id="task-form" class="flex flex-col sm:flex-row gap-3 mb-6">
+            <input type="text" id="task-input" placeholder="Add Task" class="flex-grow p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400">
+            <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition duration-300">Add Task</button>
+        </form>
+
+        <!-- List of tasks -->
+        <div id="task-list-container">
+            <h2 class="text-2xl font-semibold border-b-2 border-gray-200 dark:border-gray-700 pb-2 mb-4">Tasks</h2>
+            <ul id="task-list" class="space-y-3">
+                <!-- Tasks will be dynamically inserted here -->
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const taskForm = document.getElementById('task-form');
+        const taskInput = document.getElementById('task-input');
+        const taskList = document.getElementById('task-list');
+
+        // Function to fetch and display tasks
+        async function fetchTasks() {
+            try {
+                const response = await fetch('/api/tasks');
+                const result = await response.json();
+                if (result.message === 'success') {
+                    renderTasks(result.data);
+                }
+            } catch (error) {
+                console.error('Error fetching tasks:', error);
+            }
+        }
+
+        // Function to render tasks in the list
+        function renderTasks(tasks) {
+            taskList.innerHTML = ''; // Clear existing list
+            if (tasks.length === 0) {
+                taskList.innerHTML = '<p class="text-gray-500 dark:text-gray-400">No tasks available. Add a new one!</p>';
+                return;
+            }
+            tasks.forEach(task => {
+                const li = document.createElement('li');
+                li.className = `task-item flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg shadow-sm ${task.completed ? 'completed' : ''}`;
+                li.dataset.id = task.id;
+
+                const taskText = document.createElement('span');
+                taskText.textContent = task.task;
+                taskText.className = 'flex-grow cursor-pointer';
+                taskText.onclick = () => toggleTask(task.id, !task.completed);
+
+                const buttonsDiv = document.createElement('div');
+                buttonsDiv.className = 'flex items-center gap-2';
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.className = 'bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md text-sm transition';
+                deleteBtn.onclick = () => deleteTask(task.id);
+
+                buttonsDiv.appendChild(deleteBtn);
+                li.appendChild(taskText);
+                li.appendChild(buttonsDiv);
+                taskList.appendChild(li);
+            });
+        }
+
+        // Function to add a new task
+        async function addTask(event) {
+            event.preventDefault();
+            const taskText = taskInput.value.trim();
+            if (taskText === '') return;
+
+            try {
+                const response = await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task: taskText, completed: false })
+                });
+                if (response.ok) {
+                    taskInput.value = '';
+                    fetchTasks(); // Refresh the list
+                }
+            } catch (error) {
+                console.error('Error adding task:', error);
+            }
+        }
+
+        // Function to delete a task
+        async function deleteTask(id) {
+            try {
+                const response = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    fetchTasks(); // Refresh the list
+                }
+            } catch (error) {
+                console.error('Error deleting task:', error);
+            }
+        }
+
+        // Function to toggle task completion status
+        async function toggleTask(id, newStatus) {
+            try {
+                const response = await fetch(`/api/tasks/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ completed: newStatus })
+                });
+                if (response.ok) {
+                    fetchTasks(); // Refresh the list
+                }
+            } catch (error) {
+                console.error('Error updating task:', error);
+            }
+        }
+
+        // Event Listeners
+        taskForm.addEventListener('submit', addTask);
+
+        // Initial fetch of tasks when the page loads
+        document.addEventListener('DOMContentLoaded', fetchTasks);
+    </script>
+
+</body>
+</html>
